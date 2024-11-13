@@ -180,6 +180,7 @@ class SQLiteManager:
                 return cursor.fetchall()
             except Exception as e:
                 self.logger.error(f"Failed to get schema for {table_name}: {str(e)}")
+
                 raise
 
     def drop_table(self, table_name: str):

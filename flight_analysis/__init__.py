@@ -4,7 +4,6 @@ from .data_cleaning.column_renamer import ColumnRenamer
 from .data_cleaning.data_merger import SmartDataMerger
 from .database.sqlite_manager import SQLiteManager
 from .processor import DataProcessor
-from .analyst import FlightDataAnalyst
 
 __all__ = [
     'DataAnalyst',
@@ -13,5 +12,4 @@ __all__ = [
     'SmartDataMerger',
     'SQLiteManager',
     'DataProcessor',
-    'FlightDataAnalyst'
 ]

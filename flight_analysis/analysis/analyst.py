@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from contextlib import contextmanager
 import sqlite3
 import logging
@@ -12,6 +12,24 @@ from ..config import (
     OPENAI_API_KEY, OPENAI_MODEL, TEMPERATURE,
     DEFAULT_DB_PATH
 )
+from fuzzywuzzy import fuzz, process
+
+from typing import Dict, Any, List, Tuple
+from contextlib import contextmanager
+import sqlite3
+import logging
+from datetime import datetime
+import pandas as pd
+from crewai import Agent, Crew, Task
+from langchain_community.chat_models import ChatOpenAI
+from langchain.tools import StructuredTool
+from tabulate import tabulate
+from fuzzywuzzy import fuzz, process
+import re
+from ..config import (
+    OPENAI_API_KEY, OPENAI_MODEL, TEMPERATURE,
+    DEFAULT_DB_PATH
+)
 
 class DataAnalyst:
     def __init__(self):
@@ -21,11 +39,11 @@ class DataAnalyst:
             model_name=OPENAI_MODEL,
             openai_api_key=OPENAI_API_KEY
         )
+        self.similarity_threshold = 80  # Threshold for fuzzy matching
         self.setup_tools()
         self.setup_agents()
         self.logger = logging.getLogger(__name__)
         self.current_table = None
-
 
     @contextmanager
     def get_connection(self):
@@ -45,11 +63,106 @@ class DataAnalyst:
                         (self.current_table,))
             return cursor.fetchone()[0]
 
-    def execute_sql(self, query: str) -> str:
+    def find_similar_values(self, column: str, search_term: str) -> List[Tuple[str, int]]:
+        """Find similar values using simple case-insensitive matching"""
         with self.get_connection() as conn:
             try:
-                query = query.replace('flight_data', self.current_table)
+                # Get unique values from the column
+                query = f'SELECT DISTINCT "{column}" FROM {self.current_table} WHERE "{column}" IS NOT NULL'
                 df = pd.read_sql_query(query, conn)
+                unique_values = df[column].astype(str).tolist()
+
+                if not unique_values:
+                    self.logger.warning(f"No values found in column {column}")
+                    return []
+
+                # Simple case-insensitive matching
+                matches = process.extract(
+                    search_term.lower(),
+                    unique_values,
+                    scorer=fuzz.ratio,
+                    limit=5
+                )
+
+                # Filter matches above threshold
+                good_matches = [
+                    (match, score) for match, score in matches 
+                    if score >= self.similarity_threshold
+                ]
+                
+                # Log matches
+                if good_matches:
+                    self.logger.info(f"Found {len(good_matches)} matches for '{search_term}' in {column}")
+                    for match, score in good_matches:
+                        self.logger.info(f"  - '{match}' (score: {score})")
+                else:
+                    self.logger.info(f"No matches found for '{search_term}' in {column}")
+
+                return good_matches
+
+            except Exception as e:
+                self.logger.error(f"Error in find_similar_values: {str(e)}")
+                return []
+
+    def enhance_query_with_fuzzy_match(self, query: str) -> str:
+        """Add simple fuzzy matching to WHERE clauses"""
+        if not query:
+            return query
+            
+        try:
+            where_start = query.lower().find('where')
+            if where_start == -1:
+                return query
+
+            pre_where = query[:where_start]
+            where_clause = query[where_start:]
+
+            # Find exact match conditions
+            conditions = re.finditer(
+                r'(["\w]+)\s*=\s*["\']([^"\']+)["\']', 
+                where_clause
+            )
+
+            modified_where = where_clause
+            for match in conditions:
+                column, value = match.groups()
+                similar_values = self.find_similar_values(column, value)
+
+                if similar_values:
+                    # Create simple OR conditions with LOWER() for case-insensitivity
+                    new_conditions = [
+                        f"LOWER({column}) = LOWER('{val}')"
+                        for val, score in similar_values
+                    ]
+                    new_condition = f"({' OR '.join(new_conditions)})"
+                    
+                    # Replace the original condition
+                    modified_where = modified_where.replace(
+                        match.group(0),
+                        new_condition
+                    )
+
+            enhanced_query = pre_where + modified_where
+            if enhanced_query != query:
+                self.logger.info(f"Enhanced query from:\n{query}\nto:\n{enhanced_query}")
+            return enhanced_query
+
+        except Exception as e:
+            self.logger.error(f"Error in enhance_query_with_fuzzy_match: {str(e)}")
+            return query
+
+    def execute_sql(self, query: str) -> str:
+        try:
+            enhanced_query = self.enhance_query_with_fuzzy_match(query)
+                
+            # Log query changes
+            if enhanced_query != query:
+                self.logger.info("Original query: " + query)
+                self.logger.info("Enhanced query: " + enhanced_query)
+                
+            with self.get_connection() as conn:
+                enhanced_query = enhanced_query.replace('flight_data', self.current_table)
+                df = pd.read_sql_query(enhanced_query, conn)
                 
                 if df.empty:
                     return "No data found for this query."
@@ -66,8 +179,8 @@ class DataAnalyst:
                         df[col] = df[col].apply(lambda x: f"{int(x//60)}h {int(x%60)}m" if pd.notnull(x) else "N/A")
                 
                 return tabulate(df, headers='keys', tablefmt='pretty', showindex=False)
-            except Exception as e:
-                return f"Error executing query: {str(e)}"
+        except Exception as e:
+            return f"Error executing query: {str(e)}"
 
     def setup_tools(self):
         self.tools = [
@@ -115,8 +228,8 @@ class DataAnalyst:
                     Table name: {table_name}
                     
                     Guidelines:
-                    1. Use get_schema to understand the data structure
-                     2. Create SQL queries using the correct table name: {table_name}
+                    1. Use get_schema to understand the data structure.
+                    2. Create SQL queries using the correct table name: {table_name}
                     3. Format dates as 'YYYY-MM-DD'
                     4. Convert time differences to hours and minutes
                     5. Use proper column aliases for readability
@@ -133,6 +246,7 @@ class DataAnalyst:
 
                     1. A brief executive summary (2-3 sentences)
                     2. Key findings in simple bullet points
+                    3. Data in form of a table
                     
                     Avoid technical jargon and focus on what this means for the business.
                     Write as if explaining to someone with no technical background.
@@ -167,19 +281,13 @@ class DataAnalyst:
             return f"\nError in analysis: {analysis_results['error']}"
 
         output = [
-            f"\n{'='*60}",
-            f"FLIGHT DATA ANALYSIS REPORT",
-            f"{'='*60}",
-            f"\nBUSINESS QUESTION:",
-            f"{analysis_results['question']}",
-            f"\n{'='*60}"
+            f"DATA ANALYSIS REPORT\n",
         ]
         
         insights = analysis_results['insights']
         if isinstance(insights, dict):
             if 'Executive Summary' in insights:
                 output.extend([
-                    f"\nEXECUTIVE SUMMARY:",
                     f"{insights['Executive Summary']}",
                     ""
                 ])
@@ -196,28 +304,6 @@ class DataAnalyst:
                     output.append(insights['Key Findings'])
                 output.append("")
             
-            if 'Business Implications' in insights:
-                output.extend([
-                    f"\nBUSINESS IMPLICATIONS:",
-                    "--------------------"
-                ])
-                if isinstance(insights['Business Implications'], list):
-                    for implication in insights['Business Implications']:
-                        output.append(f"• {implication}")
-                else:
-                    output.append(insights['Business Implications'])
-                output.append("")
-            
-            if 'Actionable Recommendations' in insights:
-                output.extend([
-                    f"\nACTIONABLE RECOMMENDATIONS:",
-                    "------------------------"
-                ])
-                if isinstance(insights['Actionable Recommendations'], list):
-                    for recommendation in insights['Actionable Recommendations']:
-                        output.append(f"• {recommendation}")
-                else:
-                    output.append(insights['Actionable Recommendations'])
         else:
             output.append(str(insights))
         
