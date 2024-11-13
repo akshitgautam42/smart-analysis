@@ -1,0 +1,36 @@
+DATA ANALYSIS REPORT
+
+Executive Summary:
+KLM Royal Dutch Airlines is currently leading in terms of flight frequency, making it the most popular airline among the ones analyzed. On the other hand, Hawaiian Airlines has the fewest flights, indicating it is the least popular in this group. This data can help airlines understand their market position and strategize accordingly.
+
+Key Findings:
+- KLM Royal Dutch Airlines has the highest number of flights, with 486 flights.
+- Hawaiian Airlines has the lowest number of flights, with 389 flights.
+- British Airways and Qantas are also among the top airlines with high flight counts.
+- The difference between the most and least popular airlines in terms of flight count is 97 flights.
+
+Data Table:
+
+| Airline Name               | Flight Count |
+|----------------------------|--------------|
+| KLM Royal Dutch Airlines   | 486          |
+| British Airways            | 475          |
+| Qantas                     | 442          |
+| Allegiant Air              | 442          |
+| Air Canada                 | 439          |
+| Emirates                   | 428          |
+| Spirit Airlines            | 427          |
+| Air France                 | 424          |
+| Singapore Airlines         | 414          |
+| JetBlue Airways            | 411          |
+| Alaska Airlines            | 409          |
+| Southwest Airlines         | 408          |
+| American Airline           | 407          |
+| United Airlines            | 403          |
+| Lufthansa                  | 403          |
+| Frontier Airlines          | 400          |
+| Delta Air Lines            | 400          |
+| SkyWest Airlines           | 393          |
+| Hawaiian Airlines          | 389          |
+
+This information provides a clear picture of the current airline market dynamics, helping stakeholders make informed decisions.
