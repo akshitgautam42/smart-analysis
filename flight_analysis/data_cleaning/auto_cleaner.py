@@ -188,7 +188,18 @@ class AutoDataCleaner:
         formatted_data = json.dumps(samples, cls=EnhancedJSONEncoder)
         self.logger.debug(f"Sample data formatted successfully for {len(df.columns)} columns")
         return formatted_data
-
+    
+    def _convert_to_python_type(self, val: Any) -> Any:
+        if isinstance(val, (np.integer, np.floating)):
+            return val.item()
+        elif isinstance(val, np.bool_):
+            return bool(val)
+        elif pd.isna(val):
+            return None
+        elif isinstance(val, (str, int, float, bool)):
+            return val
+        return str(val)
+    
     def _standardize_column(self, series: pd.Series, pattern: str = None) -> pd.Series:
         """Standardize a column's values."""
         self.logger.debug(f"Standardizing column with pattern: {pattern}")
