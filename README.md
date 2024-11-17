@@ -54,24 +54,26 @@ poetry install
 cp .env.example .env
 # Add your OpenAI API key to .env
 
+#Initialize the db and cleaning CSV
+poetry run flight_analysis/main.py
+
 # Launch interactive interface
 poetry run streamlit run flight_analysis/interactive.py
 ```
 
-### Data Processing Pipeline
-```python
-from data_analysis import DataProcessor
-
-# Initialize processor
-processor = DataProcessor(
-    input_paths=["data1.csv", "data2.csv"]
-)
-
-# Process and clean data
-results = processor.process()
-```
-
 ## 🏗️ Architecture
+
+### Component Overview
+```mermaid
+graph TD
+    A[Data Input] --> B[DataProcessor]
+    B --> C[AutoDataCleaner]
+    B --> D[SmartDataMerger]
+    C --> E[Database]
+    D --> E
+    E --> F[DataAnalyst]
+    F --> G[Interactive UI]
+```
 
 ### Key Components
 
