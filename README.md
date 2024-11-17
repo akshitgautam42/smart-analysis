@@ -55,30 +55,7 @@ cp .env.example .env
 # Add your OpenAI API key to .env
 
 # Launch interactive interface
-poetry run python -m data_analysis.interactive
-```
-
-## 💻 Usage Examples
-
-### Interactive Analysis
-```python
-from data_analysis import DataAnalyst
-
-analyst = DataAnalyst()
-
-# Basic Analysis
-results = analyst.analyze("What are the top 5 categories by revenue?")
-
-# Time Series Analysis
-results = analyst.analyze("Show the monthly trend for the past year")
-
-# Complex Analysis
-results = analyst.analyze("""
-    Find patterns in the data:
-    1. Peak periods
-    2. Common combinations
-    3. Trend analysis
-""")
+poetry run streamlit run flight_analysis/interactive.py
 ```
 
 ### Data Processing Pipeline
@@ -131,7 +108,7 @@ results = processor.process()
 ### Testing
 ```bash
 # Run test suite
-pytest tests/ -v --cov=data_analysis
+pytest
 
 # Run specific test category
 pytest tests/test_cleaning.py -v
